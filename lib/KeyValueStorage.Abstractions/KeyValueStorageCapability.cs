@@ -18,9 +18,8 @@ namespace KeyValueStorage.Abstractions
         // --- EXTENSIONS ----
         KeyPrefix   = 0x1 << 8,
         Metadata    = 0x2 << 8,
-        MultiTenant = 0x4 << 8,
 
-        AllExtensions = KeyPrefix | Metadata | MultiTenant,
+        AllExtensions = KeyPrefix | Metadata,
 
         // --- EVENTS ----
         StoreEvents = 0x1 << 12,

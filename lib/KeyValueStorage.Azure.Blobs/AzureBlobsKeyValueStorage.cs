@@ -3,6 +3,8 @@ using Azure.Storage.Blobs;
 using KeyValueStorage.Abstractions;
 using System;
 using System.Collections.Generic;
+using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Azure.Storage.Blobs.Models;
@@ -248,6 +250,115 @@ namespace KeyValueStorage.Azure.Blobs
                 content,
                 options,
                 cancellationToken);
+        }
+        #endregion
+
+        #region [ IKeyAsyncMetadataLister ]
+
+        public override async Task<ICollection<KeyListerItem<string>>> ListKeysAsync(CancellationToken cancellationToken)
+        {
+            return await ListAsyncKeys(cancellationToken)
+                .SelectMany(page => page.ToAsyncEnumerable())
+                .ToListAsync(cancellationToken: cancellationToken);
+        }
+
+        public override async Task<ICollection<KeyMetadataListerItem<string, IEnumerable<KeyValuePair<string, string>>>>> ListMetadataKeysAsync(CancellationToken cancellationToken)
+        {
+            return await ListAsyncMetadataKeys(cancellationToken)
+                .SelectMany(page => page.ToAsyncEnumerable())
+                .ToListAsync(cancellationToken: cancellationToken);
+        }
+
+        public override async IAsyncEnumerable<ICollection<KeyListerItem<string>>> ListAsyncKeys(
+            [EnumeratorCancellation] CancellationToken cancellationToken)
+        {
+            var pageable = containerClient.GetBlobsAsync(
+                BlobTraits.None,
+                BlobStates.None,
+                prefix: null,
+                cancellationToken);
+
+            await foreach (var page in pageable.AsPages().WithCancellation(cancellationToken))
+            {
+                yield return page.Values
+                    .Select(item => new KeyListerItem<string>(item.Name))
+                    .ToList();
+            }
+        }
+
+        public override async IAsyncEnumerable<ICollection<KeyMetadataListerItem<string, IEnumerable<KeyValuePair<string, string>>>>> ListAsyncMetadataKeys(
+            [EnumeratorCancellation] CancellationToken cancellationToken)
+        {
+            var pageable = containerClient.GetBlobsAsync(
+                BlobTraits.Metadata,
+                BlobStates.None,
+                prefix: null,
+                cancellationToken);
+
+            await foreach (var page in pageable.AsPages().WithCancellation(cancellationToken))
+            {
+                yield return page.Values
+                    .Select(item => new KeyMetadataListerItem<string, IEnumerable<KeyValuePair<string, string>>>(item.Name, item.Metadata))
+                    .ToList();
+            }
+        }
+
+        #endregion
+
+        #region [ IKeyPrefixAsyncMetadataLister ]
+
+        public override async Task<ICollection<KeyListerItem<string>>> ListPrefixedKeysAsync(
+            string keyPrefix, 
+            CancellationToken cancellationToken)
+        {
+            return await ListAsyncPrefixedKeys(keyPrefix, cancellationToken)
+                .SelectMany(page => page.ToAsyncEnumerable())
+                .ToListAsync(cancellationToken: cancellationToken);
+        }
+
+        public override async Task<ICollection<KeyMetadataListerItem<string, IEnumerable<KeyValuePair<string, string>>>>> ListPrefixedMetadataKeysAsync(
+            string keyPrefix, 
+            CancellationToken cancellationToken)
+        {
+            return await ListAsyncPrefixedMetadataKeys(keyPrefix, cancellationToken)
+                .SelectMany(page => page.ToAsyncEnumerable())
+                .ToListAsync(cancellationToken: cancellationToken);
+        }
+
+        public override async IAsyncEnumerable<ICollection<KeyListerItem<string>>> ListAsyncPrefixedKeys(
+            string keyPrefix, 
+            [EnumeratorCancellation] CancellationToken cancellationToken)
+        {
+            var pageable = containerClient.GetBlobsAsync(
+                BlobTraits.None,
+                BlobStates.None,
+                keyPrefix,
+                cancellationToken);
+
+            await foreach (var page in pageable.AsPages().WithCancellation(cancellationToken))
+            {
+                yield return page.Values
+                    .Select(item => new KeyListerItem<string>(item.Name))
+                    .ToList();
+            }
+        }
+
+        public override async IAsyncEnumerable<ICollection<KeyMetadataListerItem<string, IEnumerable<KeyValuePair<string, string>>>>> ListAsyncPrefixedMetadataKeys(
+            string keyPrefix, 
+            [EnumeratorCancellation] CancellationToken cancellationToken)
+        {
+            var pageable = containerClient.GetBlobsAsync(
+                BlobTraits.Metadata,
+                BlobStates.None,
+                keyPrefix,
+                cancellationToken);
+
+            await foreach (var page in pageable.AsPages().WithCancellation(cancellationToken))
+            {
+                yield return page.Values
+                    .Select(item => new KeyMetadataListerItem<string, IEnumerable<KeyValuePair<string, string>>>(item.Name, item.Metadata))
+                    .ToList();
+            }
         }
 
         #endregion

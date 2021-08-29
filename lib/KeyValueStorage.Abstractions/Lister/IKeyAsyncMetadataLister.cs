@@ -16,7 +16,7 @@ namespace KeyValueStorage.Abstractions
         IKeyMetadataLister<TKey, TMetadata>,
         IKeyAsyncMetadataLister
     {
-        new IAsyncEnumerable<ICollection<KeyMetadataListerItem>> ListAsyncMetadataKeys(
+        new IAsyncEnumerable<ICollection<KeyMetadataListerItem<TKey, TMetadata>>> ListAsyncMetadataKeys(
             CancellationToken cancellationToken = default);
     }
 }

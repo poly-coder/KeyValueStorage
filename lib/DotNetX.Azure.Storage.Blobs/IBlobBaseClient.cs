@@ -1,12 +1,12 @@
-﻿using System;
+﻿using Azure;
+using Azure.Storage;
+using Azure.Storage.Blobs.Models;
+using Azure.Storage.Sas;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
-using Azure;
-using Azure.Storage;
-using Azure.Storage.Blobs.Models;
-using Azure.Storage.Sas;
 
 namespace DotNetX.Azure.Storage.Blobs
 {

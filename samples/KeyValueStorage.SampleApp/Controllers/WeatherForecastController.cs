@@ -4,6 +4,7 @@ using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 
 namespace KeyValueStorage.SampleApp.Controllers
 {
@@ -37,6 +38,14 @@ namespace KeyValueStorage.SampleApp.Controllers
                 Summary = Summaries[rng.Next(Summaries.Length)]
             })
             .ToArray();
+        }
+
+        [HttpPost("run-sample")]
+        public async Task RunSample()
+        {
+            var sample = new SampleMailboxActor();
+
+            await sample.RunSample();
         }
     }
 }

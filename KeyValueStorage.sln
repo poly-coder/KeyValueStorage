@@ -21,11 +21,11 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "KeyValueStorage.InMemory", 
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DotNetX.Azure.Storage.Blobs", "lib\DotNetX.Azure.Storage.Blobs\DotNetX.Azure.Storage.Blobs.csproj", "{F770F510-C643-4DC5-9155-5CDBDC73EDA6}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KeyValueStorage.SampleApp", "samples\KeyValueStorage.SampleApp\KeyValueStorage.SampleApp.csproj", "{2AA6731B-D41B-405D-ACEB-5F5C9E037521}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "KeyValueStorage.SampleApp", "samples\KeyValueStorage.SampleApp\KeyValueStorage.SampleApp.csproj", "{2AA6731B-D41B-405D-ACEB-5F5C9E037521}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "samples", "samples", "{63B7EFDA-91B3-4336-81AD-DECAE5E02B46}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DotNetX.Azure.Storage.Blobs.DependencyInjection", "lib\DotNetX.Azure.Storage.Blobs.DependencyInjection\DotNetX.Azure.Storage.Blobs.DependencyInjection.csproj", "{EA500CB0-2D0E-46CD-A54D-3FB5ACD3F85D}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DotNetX.Azure.Storage.Blobs.DependencyInjection", "lib\DotNetX.Azure.Storage.Blobs.DependencyInjection\DotNetX.Azure.Storage.Blobs.DependencyInjection.csproj", "{EA500CB0-2D0E-46CD-A54D-3FB5ACD3F85D}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

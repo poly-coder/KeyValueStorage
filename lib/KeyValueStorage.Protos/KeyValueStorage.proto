@@ -1,0 +1,250 @@
+﻿syntax = "proto3";
+
+package keyvaluestorage.protobuf;
+option csharp_namespace = "KeyValueStorage.Protos";
+
+/**************** Services *****************/
+
+service KeyValueStorage {
+	rpc GetCapabilities (GetCapabilitiesRequest) returns (GetCapabilitiesResponse);
+}
+
+/* Fetchers */
+
+service KeyValueFetcher {
+	rpc Fetch (FetchRequest) returns (FetchResponse);
+}
+
+service KeyValueMetadataFetcher {
+	rpc FetchMetadata (FetchMetadataRequest) returns (FetchMetadataResponse);
+	rpc FetchMetadataAndValue (FetchMetadataAndValueRequest) returns (FetchMetadataAndValueResponse);
+}
+
+/* Storers */
+
+service KeyValueStorer {
+	rpc Store (StoreRequest) returns (StoreResponse);
+	rpc Remove (RemoveRequest) returns (RemoveResponse);
+}
+
+service KeyValueMetadataStorer {
+	rpc StoreMetadata (StoreMetadataRequest) returns (StoreMetadataResponse);
+	rpc StoreMetadataAndValue (StoreMetadataAndValueRequest) returns (StoreMetadataAndValueResponse);
+}
+
+/* Listers */
+
+service KeyLister {
+	rpc ListKeys (ListKeysRequest) returns (ListKeysResponse);
+}
+
+service KeyMetadataLister {
+	rpc ListMetadataKeys (ListMetadataKeysRequest) returns (ListMetadataKeysResponse);
+}
+
+service KeyAsyncLister {
+	rpc ListAsyncKeys (ListAsyncKeysRequest) returns (stream ListAsyncKeysResponse);
+}
+
+service KeyAsyncMetadataLister {
+	rpc ListAsyncMetadataKeys (ListAsyncMetadataKeysRequest) returns (stream ListAsyncMetadataKeysResponse);
+}
+
+/* Prefix Listers */
+
+service KeyPrefixLister {
+	rpc ListPrefixedKeys (ListPrefixedKeysRequest) returns (ListPrefixedKeysResponse);
+}
+
+service KeyPrefixMetadataLister {
+	rpc ListPrefixedMetadataKeys (ListPrefixedMetadataKeysRequest) returns (ListPrefixedMetadataKeysResponse);
+}
+
+service KeyPrefixAsyncLister {
+	rpc ListAsyncPrefixedKeys (ListAsyncPrefixedKeysRequest) returns (stream ListAsyncPrefixedKeysResponse);
+}
+
+service KeyPrefixAsyncMetadataLister {
+	rpc ListAsyncPrefixedMetadataKeys (ListAsyncPrefixedMetadataKeysRequest) returns (stream ListAsyncPrefixedMetadataKeysResponse);
+}
+
+/************* Messages *************/
+
+/* KeyValueStorage */
+
+message GetCapabilitiesRequest {
+}
+
+message GetCapabilitiesResponse {
+	bool fetch = 1;
+	bool store = 2;
+	bool list = 3;
+	bool async_list = 4;
+	bool key_prefix = 5;
+	bool metadata = 6;
+	bool store_events = 7;
+	// TODO: add prefix separator
+}
+
+/* KeyValueFetcher */
+
+message FetchRequest {
+	string key = 1;
+}
+
+message FetchResponse {
+	bool exists = 1;
+	bytes value = 2;
+}
+
+/* KeyValueMetadataFetcher */
+
+message FetchMetadataRequest {
+	string key = 1;
+}
+
+message FetchMetadataResponse {
+	bool exists = 1;
+	map<string, string> metadata = 2;
+}
+
+message FetchMetadataAndValueRequest {
+	string key = 1;
+}
+
+message FetchMetadataAndValueResponse {
+	bool exists = 1;
+	bytes value = 2;
+	map<string, string> metadata = 3;
+}
+
+/* KeyValueStorer */
+
+enum StoreMode {
+	UNKNOWN = 0;
+	CREATE_NEW = 1;
+	REPLACE_EXISTING = 2;
+	CREATE_OR_REPLACE = 3;
+}
+
+message StoreRequest {
+	string key = 1;
+	bytes value = 2;
+	StoreMode store_mode = 3;
+}
+
+message StoreResponse {
+}
+
+message RemoveRequest {
+	string key = 1;
+}
+
+message RemoveResponse {
+}
+
+/* KeyValueMetadataStorer */
+
+message StoreMetadataRequest {
+	string key = 1;
+	map<string, string> metadata = 2;
+	StoreMode store_mode = 3;
+}
+
+message StoreMetadataResponse {
+}
+
+message StoreMetadataAndValueRequest {
+	string key = 1;
+	bytes value = 2;
+	map<string, string> metadata = 3;
+	StoreMode store_mode = 4;
+}
+
+message StoreMetadataAndValueResponse {
+}
+
+/* KeyLister */
+
+message ListKeysRequest {
+}
+
+message ListKeysResponse {
+	repeated KeyListerItem items = 1;
+}
+
+message KeyListerItem {
+	string key = 1;
+}
+
+/* KeyMetadataLister */
+
+message ListMetadataKeysRequest {
+}
+
+message ListMetadataKeysResponse {
+	repeated KeyMetadataListerItem items = 1;
+}
+
+message KeyMetadataListerItem {
+	string key = 1;
+	map<string, string> metadata = 2;
+}
+
+/* KeyAsyncLister */
+
+message ListAsyncKeysRequest {
+}
+
+message ListAsyncKeysResponse {
+	repeated KeyListerItem items = 1;
+}
+
+/* KeyAsyncMetadataLister */
+
+message ListAsyncMetadataKeysRequest {
+}
+
+message ListAsyncMetadataKeysResponse {
+	repeated KeyMetadataListerItem items = 1;
+}
+
+/* KeyPrefixLister */
+
+message ListPrefixedKeysRequest {
+	string keyPrefix = 1;
+}
+
+message ListPrefixedKeysResponse {
+	repeated KeyListerItem items = 1;
+}
+
+/* KeyPrefixMetadataLister */
+
+message ListPrefixedMetadataKeysRequest {
+	string keyPrefix = 1;
+}
+
+message ListPrefixedMetadataKeysResponse {
+	repeated KeyMetadataListerItem items = 1;
+}
+
+/* KeyPrefixAsyncLister */
+
+message ListAsyncPrefixedKeysRequest {
+	string keyPrefix = 1;
+}
+
+message ListAsyncPrefixedKeysResponse {
+	repeated KeyListerItem items = 1;
+}
+
+/* KeyPrefixAsyncMetadataLister */
+
+message ListAsyncPrefixedMetadataKeysRequest {
+	string keyPrefix = 1;
+}
+
+message ListAsyncPrefixedMetadataKeysResponse {
+	repeated KeyMetadataListerItem items = 1;
+}

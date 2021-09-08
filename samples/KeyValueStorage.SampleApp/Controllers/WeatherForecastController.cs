@@ -39,13 +39,5 @@ namespace KeyValueStorage.SampleApp.Controllers
             })
             .ToArray();
         }
-
-        [HttpPost("run-sample")]
-        public async Task RunSample()
-        {
-            var sample = new SampleMailboxActor();
-
-            await sample.RunSample();
-        }
     }
 }

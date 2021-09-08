@@ -25,12 +25,12 @@ namespace KeyValueStorage.Abstractions
         [DoesNotReturn]
         private void CheckCapability(KeyValueStorageCapability capability, string name)
         {
-            if (capabilities.HasFlag(capability))
+            if (!capabilities.HasFlag(capability))
             {
-                throw new NotImplementedException($"Capability {capability} is not implemented, even when declared");
+                throw new NotImplementedException($"Capability {name} is not implemented, even when declared");
             }
 
-            throw new NotSupportedException($"Capability {capability} is not supported");
+            throw new NotSupportedException($"Capability {name} is not supported");
         }
 
         #region [ IKeyValueStorage ]

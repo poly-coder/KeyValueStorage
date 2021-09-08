@@ -5,6 +5,7 @@ namespace KeyValueStorage.Abstractions
 {
     public interface IKeyValueStorage
     {
+        // TODO: add prefix separator
         Task<KeyValueStorageCapability> GetCapabilitiesAsync(
             CancellationToken cancellationToken = default);
     }

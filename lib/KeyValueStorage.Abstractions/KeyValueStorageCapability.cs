@@ -2,6 +2,14 @@
 
 namespace KeyValueStorage.Abstractions
 {
+    /// <summary>
+    /// |             | Metadata | KeyPrefix |
+    /// | Fetch       |    X     |           |
+    /// | Store       |    X     |           | 
+    /// | List        |    X     |    X      |
+    /// | AsyncList   |    X     |    X      |
+    /// | StoreEvents |    X     |    X      |
+    /// </summary>
     [Flags]
     public enum KeyValueStorageCapability
     {
@@ -15,18 +23,18 @@ namespace KeyValueStorage.Abstractions
 
         AllFeatures = Fetch | Store | List | AsyncList,
 
-        // --- EXTENSIONS ----
-        KeyPrefix   = 0x1 << 8,
-        Metadata    = 0x2 << 8,
-
-        AllExtensions = KeyPrefix | Metadata,
-
         // --- EVENTS ----
-        StoreEvents = 0x1 << 12,
+        StoreEvents = 0x1 << 8,
 
         AllEvents   = StoreEvents,
 
+        // --- EXTENSIONS ----
+        KeyPrefix   = 0x1 << 12,
+        Metadata    = 0x2 << 12,
+
+        AllExtensions = KeyPrefix | Metadata,
+
         // --- ALL -------
-        All = AllFeatures | AllExtensions | AllEvents,
+        All = AllFeatures | AllEvents | AllExtensions,
     }
 }

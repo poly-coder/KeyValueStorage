@@ -8,11 +8,12 @@ using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Azure.Storage.Blobs.Models;
+using Metadata = System.Collections.Generic.IEnumerable<System.Collections.Generic.KeyValuePair<string, string>>;
 
 namespace KeyValueStorage.Azure.Blobs
 {
     public class AzureBlobsKeyValueStorage :
-        LocalKeyValueStorageBase<string, byte[], IEnumerable<KeyValuePair<string, string>>>
+        LocalKeyValueStorageBase<string, byte[], Metadata>
     {
         private readonly BlobContainerClient containerClient;
 
@@ -66,7 +67,7 @@ namespace KeyValueStorage.Azure.Blobs
             }
         }
 
-        public override async Task<KeyValueMetadataFetchResponse<byte[], IEnumerable<KeyValuePair<string, string>>>> FetchMetadataAsync(
+        public override async Task<KeyValueMetadataFetchResponse<byte[], Metadata>> FetchMetadataAsync(
             string key,
             CancellationToken cancellationToken = default)
         {
@@ -78,17 +79,17 @@ namespace KeyValueStorage.Azure.Blobs
 
                 var metadata = result.Value.Metadata;
 
-                return new KeyValueMetadataFetchResponse<byte[], IEnumerable<KeyValuePair<string, string>>>(
+                return new KeyValueMetadataFetchResponse<byte[], Metadata>(
                     true, default, metadata);
             }
             catch (RequestFailedException e) when (e.Status == 404)
             {
-                return new KeyValueMetadataFetchResponse<byte[], IEnumerable<KeyValuePair<string, string>>>(
+                return new KeyValueMetadataFetchResponse<byte[], Metadata>(
                     false, default, default);
             }
         }
 
-        public override async Task<KeyValueMetadataFetchResponse<byte[], IEnumerable<KeyValuePair<string, string>>>> FetchMetadataAndValueAsync(
+        public override async Task<KeyValueMetadataFetchResponse<byte[], Metadata>> FetchMetadataAndValueAsync(
             string key,
             CancellationToken cancellationToken = default)
         {
@@ -104,12 +105,12 @@ namespace KeyValueStorage.Azure.Blobs
 
                 var bytes = result.Value.Content.ToArray();
 
-                return new KeyValueMetadataFetchResponse<byte[], IEnumerable<KeyValuePair<string, string>>>(
+                return new KeyValueMetadataFetchResponse<byte[], Metadata>(
                     true, bytes, metadata);
             }
             catch (RequestFailedException e) when (e.Status == 404)
             {
-                return new KeyValueMetadataFetchResponse<byte[], IEnumerable<KeyValuePair<string, string>>>(
+                return new KeyValueMetadataFetchResponse<byte[], Metadata>(
                     false, default, default);
             }
         }
@@ -171,7 +172,7 @@ namespace KeyValueStorage.Azure.Blobs
 
         public override async Task StoreMetadataAsync(
             string key,
-            IEnumerable<KeyValuePair<string, string>> metadata,
+            Metadata metadata,
             KeyValueStoreMode storeMode = KeyValueStoreMode.CreateOrReplace,
             CancellationToken cancellationToken = default)
         {
@@ -206,7 +207,7 @@ namespace KeyValueStorage.Azure.Blobs
         public override async Task StoreMetadataAndValueAsync(
             string key,
             byte[] value,
-            IEnumerable<KeyValuePair<string, string>> metadata,
+            Metadata metadata,
             KeyValueStoreMode storeMode = KeyValueStoreMode.CreateOrReplace,
             CancellationToken cancellationToken = default)
         {
@@ -262,7 +263,7 @@ namespace KeyValueStorage.Azure.Blobs
                 .ToListAsync(cancellationToken: cancellationToken);
         }
 
-        public override async Task<ICollection<KeyMetadataListerItem<string, IEnumerable<KeyValuePair<string, string>>>>> ListMetadataKeysAsync(CancellationToken cancellationToken)
+        public override async Task<ICollection<KeyMetadataListerItem<string, Metadata>>> ListMetadataKeysAsync(CancellationToken cancellationToken)
         {
             return await ListAsyncMetadataKeys(cancellationToken)
                 .SelectMany(page => page.ToAsyncEnumerable())
@@ -286,7 +287,7 @@ namespace KeyValueStorage.Azure.Blobs
             }
         }
 
-        public override async IAsyncEnumerable<ICollection<KeyMetadataListerItem<string, IEnumerable<KeyValuePair<string, string>>>>> ListAsyncMetadataKeys(
+        public override async IAsyncEnumerable<ICollection<KeyMetadataListerItem<string, Metadata>>> ListAsyncMetadataKeys(
             [EnumeratorCancellation] CancellationToken cancellationToken)
         {
             var pageable = containerClient.GetBlobsAsync(
@@ -298,7 +299,7 @@ namespace KeyValueStorage.Azure.Blobs
             await foreach (var page in pageable.AsPages().WithCancellation(cancellationToken))
             {
                 yield return page.Values
-                    .Select(item => new KeyMetadataListerItem<string, IEnumerable<KeyValuePair<string, string>>>(item.Name, item.Metadata))
+                    .Select(item => new KeyMetadataListerItem<string, Metadata>(item.Name, item.Metadata))
                     .ToList();
             }
         }
@@ -316,7 +317,7 @@ namespace KeyValueStorage.Azure.Blobs
                 .ToListAsync(cancellationToken: cancellationToken);
         }
 
-        public override async Task<ICollection<KeyMetadataListerItem<string, IEnumerable<KeyValuePair<string, string>>>>> ListPrefixedMetadataKeysAsync(
+        public override async Task<ICollection<KeyMetadataListerItem<string, Metadata>>> ListPrefixedMetadataKeysAsync(
             string keyPrefix, 
             CancellationToken cancellationToken)
         {
@@ -343,7 +344,7 @@ namespace KeyValueStorage.Azure.Blobs
             }
         }
 
-        public override async IAsyncEnumerable<ICollection<KeyMetadataListerItem<string, IEnumerable<KeyValuePair<string, string>>>>> ListAsyncPrefixedMetadataKeys(
+        public override async IAsyncEnumerable<ICollection<KeyMetadataListerItem<string, Metadata>>> ListAsyncPrefixedMetadataKeys(
             string keyPrefix, 
             [EnumeratorCancellation] CancellationToken cancellationToken)
         {
@@ -356,7 +357,7 @@ namespace KeyValueStorage.Azure.Blobs
             await foreach (var page in pageable.AsPages().WithCancellation(cancellationToken))
             {
                 yield return page.Values
-                    .Select(item => new KeyMetadataListerItem<string, IEnumerable<KeyValuePair<string, string>>>(item.Name, item.Metadata))
+                    .Select(item => new KeyMetadataListerItem<string, Metadata>(item.Name, item.Metadata))
                     .ToList();
             }
         }

@@ -13,7 +13,8 @@ namespace KeyValueStorage.Abstractions
     }
 
     public interface IKeyPrefixMetadataLister<TKey, TMetadata> :
-        IKeyPrefixMetadataLister
+        IKeyPrefixMetadataLister,
+        IKeyPrefixLister<TKey>
     {
         Task<ICollection<KeyMetadataListerItem<TKey, TMetadata>>> ListPrefixedMetadataKeysAsync(
             TKey keyPrefix,

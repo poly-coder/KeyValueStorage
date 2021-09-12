@@ -68,6 +68,24 @@ service KeyPrefixAsyncMetadataLister {
 	rpc ListAsyncPrefixedMetadataKeys (ListAsyncPrefixedMetadataKeysRequest) returns (stream ListAsyncPrefixedMetadataKeysResponse);
 }
 
+/* Store Events */
+
+service KeyStoreEvents {
+	rpc SubscribeKeyEvents (SubscribeKeyEventsRequest) returns (stream SubscribeKeyEventsResponse);
+}
+
+service KeyMetadataStoreEvents {
+	rpc SubscribeKeyMetadataEvents (SubscribeKeyMetadataEventsRequest) returns (stream SubscribeKeyMetadataEventsResponse);
+}
+
+service KeyPrefixStoreEvents {
+	rpc SubscribeKeyPrefixEvents (SubscribeKeyPrefixEventsRequest) returns (stream SubscribeKeyPrefixEventsResponse);
+}
+
+service KeyPrefixMetadataStoreEvents {
+	rpc SubscribeKeyPrefixMetadataEvents (SubscribeKeyPrefixMetadataEventsRequest) returns (stream SubscribeKeyPrefixMetadataEventsResponse);
+}
+
 /************* Messages *************/
 
 /* KeyValueStorage */
@@ -76,13 +94,19 @@ message GetCapabilitiesRequest {
 }
 
 message GetCapabilitiesResponse {
+	// Features
 	bool fetch = 1;
 	bool store = 2;
 	bool list = 3;
 	bool async_list = 4;
-	bool key_prefix = 5;
-	bool metadata = 6;
-	bool store_events = 7;
+
+	// Events
+	bool store_events = 5;
+
+	// Extensions
+	bool key_prefix = 6;
+	bool metadata = 7;
+
 	// TODO: add prefix separator
 }
 
@@ -121,7 +145,7 @@ message FetchMetadataAndValueResponse {
 /* KeyValueStorer */
 
 enum StoreMode {
-	UNKNOWN = 0;
+	UNKNOWN_STORE_MODE = 0;
 	CREATE_NEW = 1;
 	REPLACE_EXISTING = 2;
 	CREATE_OR_REPLACE = 3;
@@ -247,4 +271,62 @@ message ListAsyncPrefixedMetadataKeysRequest {
 
 message ListAsyncPrefixedMetadataKeysResponse {
 	repeated KeyMetadataListerItem items = 1;
+}
+
+/* KeyStoreEvents */
+
+enum KeyStoreEventType {
+	UNKNOWN_KEY_STORE_EVENT_TYPE = 0;
+	CREATED = 1;
+	REPLACED = 2;
+	REMOVED = 3;
+}
+
+message KeyStoreEvent {
+	KeyStoreEventType type = 1;
+	string key = 2;
+}
+
+message SubscribeKeyEventsRequest {
+}
+
+message SubscribeKeyEventsResponse {
+	repeated KeyStoreEvent events = 1;
+}
+
+/* KeyMetadataStoreEvents */
+
+message KeyMetadataStoreEvent {
+	KeyStoreEventType type = 1;
+	string key = 2;
+	map<string, string> metadata = 3;
+	bool replaced_metadata = 4;
+	bool replaced_value = 5;
+}
+
+message SubscribeKeyMetadataEventsRequest {
+}
+
+message SubscribeKeyMetadataEventsResponse {
+	repeated KeyMetadataStoreEvent events = 1;
+}
+
+/* KeyPrefixStoreEvents */
+
+message SubscribeKeyPrefixEventsRequest {
+	string keyPrefix = 1;
+}
+
+message SubscribeKeyPrefixEventsResponse {
+	repeated KeyStoreEvent events = 1;
+}
+
+/* KeyPrefixMetadataStoreEvents */
+
+message SubscribeKeyPrefixMetadataEventsRequest {
+	string keyPrefix = 1;
+}
+
+message SubscribeKeyPrefixMetadataEventsResponse {
+	repeated KeyMetadataStoreEvent events = 1;
 }

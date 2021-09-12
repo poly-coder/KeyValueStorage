@@ -1,12 +1,13 @@
-﻿using KeyValueStorage.Abstractions;
+﻿using Google.Protobuf;
+using KeyValueStorage.Abstractions;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Net.Http.Headers;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
-using Google.Protobuf;
+using Grpc.Core;
+using Metadata = System.Collections.Generic.IEnumerable<System.Collections.Generic.KeyValuePair<string, string>>;
 
 namespace KeyValueStorage.Protos
 {
@@ -14,19 +15,7 @@ namespace KeyValueStorage.Protos
     // TODO: Pass a Credentials provider in case auth is required
     // TODO: Pass OpenTelemetry headers and create StartActivity when a call is received with corresponding headers
     public class ProtoClientKeyValueStorage :
-        IKeyValueStorage,
-        IKeyValueFetcher<string, byte[]>,
-        IKeyValueMetadataFetcher<string, byte[], IEnumerable<KeyValuePair<string, string>>>,
-        IKeyValueStorer<string, byte[]>,
-        IKeyValueMetadataStorer<string, byte[], IEnumerable<KeyValuePair<string, string>>>,
-        IKeyLister<string>,
-        IKeyMetadataLister<string, IEnumerable<KeyValuePair<string, string>>>,
-        IKeyAsyncLister<string>,
-        IKeyAsyncMetadataLister<string, IEnumerable<KeyValuePair<string, string>>>,
-        IKeyPrefixLister<string>,
-        IKeyPrefixMetadataLister<string, IEnumerable<KeyValuePair<string, string>>>,
-        IKeyPrefixAsyncLister<string>,
-        IKeyPrefixAsyncMetadataLister<string, IEnumerable<KeyValuePair<string, string>>>
+        KeyValueStorageBase<string, byte[], Metadata>
 
     {
         private readonly KeyValueStorage.KeyValueStorageClient keyValueStorageClient;
@@ -42,6 +31,10 @@ namespace KeyValueStorage.Protos
         private readonly KeyPrefixMetadataLister.KeyPrefixMetadataListerClient? keyPrefixMetadataListerClient;
         private readonly KeyPrefixAsyncLister.KeyPrefixAsyncListerClient? keyPrefixAsyncListerClient;
         private readonly KeyPrefixAsyncMetadataLister.KeyPrefixAsyncMetadataListerClient? keyPrefixAsyncMetadataListerClient;
+        private readonly KeyStoreEvents.KeyStoreEventsClient? keyStoreEventsClient;
+        private readonly KeyMetadataStoreEvents.KeyMetadataStoreEventsClient? keyMetadataStoreEventsClient;
+        private readonly KeyPrefixStoreEvents.KeyPrefixStoreEventsClient? keyPrefixStoreEventsClient;
+        private readonly KeyPrefixMetadataStoreEvents.KeyPrefixMetadataStoreEventsClient? keyPrefixMetadataStoreEventsClient;
 
         public ProtoClientKeyValueStorage(
             KeyValueStorage.KeyValueStorageClient keyValueStorageClient,
@@ -56,7 +49,11 @@ namespace KeyValueStorage.Protos
             KeyPrefixLister.KeyPrefixListerClient? keyPrefixListerClient = null,
             KeyPrefixMetadataLister.KeyPrefixMetadataListerClient? keyPrefixMetadataListerClient = null,
             KeyPrefixAsyncLister.KeyPrefixAsyncListerClient? keyPrefixAsyncListerClient = null,
-            KeyPrefixAsyncMetadataLister.KeyPrefixAsyncMetadataListerClient? keyPrefixAsyncMetadataListerClient = null
+            KeyPrefixAsyncMetadataLister.KeyPrefixAsyncMetadataListerClient? keyPrefixAsyncMetadataListerClient = null,
+            KeyStoreEvents.KeyStoreEventsClient? keyStoreEventsClient = null,
+            KeyMetadataStoreEvents.KeyMetadataStoreEventsClient? keyMetadataStoreEventsClient = null,
+            KeyPrefixStoreEvents.KeyPrefixStoreEventsClient? keyPrefixStoreEventsClient = null,
+            KeyPrefixMetadataStoreEvents.KeyPrefixMetadataStoreEventsClient? keyPrefixMetadataStoreEventsClient = null
             )
         {
             this.keyValueStorageClient = keyValueStorageClient;
@@ -72,7 +69,13 @@ namespace KeyValueStorage.Protos
             this.keyPrefixMetadataListerClient = keyPrefixMetadataListerClient;
             this.keyPrefixAsyncListerClient = keyPrefixAsyncListerClient;
             this.keyPrefixAsyncMetadataListerClient = keyPrefixAsyncMetadataListerClient;
+            this.keyStoreEventsClient = keyStoreEventsClient;
+            this.keyMetadataStoreEventsClient = keyMetadataStoreEventsClient;
+            this.keyPrefixStoreEventsClient = keyPrefixStoreEventsClient;
+            this.keyPrefixMetadataStoreEventsClient = keyPrefixMetadataStoreEventsClient;
         }
+
+        #region [ IKeyValueStorage ]
 
         private async Task CheckCapability(
             KeyValueStorageCapability capability,
@@ -94,75 +97,66 @@ namespace KeyValueStorage.Protos
             }
         }
 
-        #region [ IKeyValueStorage ]
-
-        private KeyValueStorageCapability? _capabilities;
-
-        public async Task<KeyValueStorageCapability> GetCapabilitiesAsync(
-            CancellationToken cancellationToken = default)
-        {
-            if (_capabilities is null)
-            {
-                _capabilities = await GetRemoteCapabilitiesAsync(cancellationToken);
-            }
-
-            return _capabilities.Value;
-
-        }
-
-        private async Task<KeyValueStorageCapability> GetRemoteCapabilitiesAsync(
+        protected override async Task<KeyValueStorageCapability> GetCapabilitiesOverride(
             CancellationToken cancellationToken)
         {
             var request = new GetCapabilitiesRequest();
 
             var response = await keyValueStorageClient.GetCapabilitiesAsync(
-                request, cancellationToken: cancellationToken);
+                request,
+                cancellationToken: cancellationToken);
 
-            var flags = KeyValueStorageCapability.None;
+            return ToProperFlags(response);
 
-            if (response.Fetch)
+            static KeyValueStorageCapability ToProperFlags(
+                GetCapabilitiesResponse response)
             {
-                flags |= KeyValueStorageCapability.Fetch;
-            }
+                var flags = KeyValueStorageCapability.None;
 
-            if (response.Store)
-            {
-                flags |= KeyValueStorageCapability.Store;
-            }
+                if (response.Fetch)
+                {
+                    flags |= KeyValueStorageCapability.Fetch;
+                }
 
-            if (response.List)
-            {
-                flags |= KeyValueStorageCapability.List;
-            }
+                if (response.Store)
+                {
+                    flags |= KeyValueStorageCapability.Store;
+                }
 
-            if (response.AsyncList)
-            {
-                flags |= KeyValueStorageCapability.AsyncList;
-            }
+                if (response.List)
+                {
+                    flags |= KeyValueStorageCapability.List;
+                }
 
-            if (response.KeyPrefix)
-            {
-                flags |= KeyValueStorageCapability.KeyPrefix;
-            }
+                if (response.AsyncList)
+                {
+                    flags |= KeyValueStorageCapability.AsyncList;
+                }
 
-            if (response.Metadata)
-            {
-                flags |= KeyValueStorageCapability.Metadata;
-            }
+                if (response.KeyPrefix)
+                {
+                    flags |= KeyValueStorageCapability.KeyPrefix;
+                }
 
-            if (response.StoreEvents)
-            {
-                flags |= KeyValueStorageCapability.StoreEvents;
-            }
+                if (response.Metadata)
+                {
+                    flags |= KeyValueStorageCapability.Metadata;
+                }
 
-            return flags;
+                if (response.StoreEvents)
+                {
+                    flags |= KeyValueStorageCapability.StoreEvents;
+                }
+
+                return flags;
+            }
         }
 
         #endregion
 
         #region [ IKeyValueFetcher ]
 
-        public async Task<KeyValueFetchResponse<byte[]>> FetchAsync(
+        public override async Task<KeyValueFetchResponse<byte[]>> FetchAsync(
             string key,
             CancellationToken cancellationToken = default)
         {
@@ -190,24 +184,11 @@ namespace KeyValueStorage.Protos
             return new KeyValueFetchResponse<byte[]>(false, default!);
         }
 
-        async Task<KeyValueFetchResponse> IKeyValueFetcher.FetchAsync(
-            object key,
-            CancellationToken cancellationToken)
-        {
-            var response = await FetchAsync(
-                (string)key,
-                cancellationToken);
-
-            return new KeyValueFetchResponse(
-                response.Exists,
-                response.Exists ? response.Value : default(object));
-        }
-
         #endregion
 
         #region [ IKeyValueMetadataFetcher ]
 
-        public async Task<KeyValueMetadataFetchResponse<byte[], IEnumerable<KeyValuePair<string, string>>>> FetchMetadataAsync(
+        public override async Task<KeyValueMetadataFetchResponse<byte[], Metadata>> FetchMetadataAsync(
             string key,
             CancellationToken cancellationToken = default)
         {
@@ -227,17 +208,17 @@ namespace KeyValueStorage.Protos
 
             if (response.Exists)
             {
-                return new KeyValueMetadataFetchResponse<byte[], IEnumerable<KeyValuePair<string, string>>>(
+                return new KeyValueMetadataFetchResponse<byte[], Metadata>(
                     true,
                     default!,
                     response.Metadata.ToList());
             }
 
-            return new KeyValueMetadataFetchResponse<byte[], IEnumerable<KeyValuePair<string, string>>>(
+            return new KeyValueMetadataFetchResponse<byte[], Metadata>(
                 false, default!, default!);
         }
 
-        public async Task<KeyValueMetadataFetchResponse<byte[], IEnumerable<KeyValuePair<string, string>>>> FetchMetadataAndValueAsync(
+        public override async Task<KeyValueMetadataFetchResponse<byte[], Metadata>> FetchMetadataAndValueAsync(
             string key,
             CancellationToken cancellationToken = default)
         {
@@ -257,49 +238,21 @@ namespace KeyValueStorage.Protos
 
             if (response.Exists)
             {
-                return new KeyValueMetadataFetchResponse<byte[], IEnumerable<KeyValuePair<string, string>>>(
+                return new KeyValueMetadataFetchResponse<byte[], Metadata>(
                     true,
                     response.Value.ToByteArray(),
                     response.Metadata.ToList());
             }
 
-            return new KeyValueMetadataFetchResponse<byte[], IEnumerable<KeyValuePair<string, string>>>(
+            return new KeyValueMetadataFetchResponse<byte[], Metadata>(
                 false, default!, default!);
-        }
-
-        async Task<KeyValueMetadataFetchResponse> IKeyValueMetadataFetcher.FetchMetadataAsync(
-            object key,
-            CancellationToken cancellationToken)
-        {
-            var response = await FetchMetadataAsync(
-                (string)key,
-                cancellationToken);
-
-            return new KeyValueMetadataFetchResponse(
-                response.Exists,
-                response.Exists ? response.Value : default(object),
-                default);
-        }
-
-        async Task<KeyValueMetadataFetchResponse> IKeyValueMetadataFetcher.FetchMetadataAndValueAsync(
-            object key,
-            CancellationToken cancellationToken)
-        {
-            var response = await FetchMetadataAndValueAsync(
-                (string)key,
-                cancellationToken);
-
-            return new KeyValueMetadataFetchResponse(
-                response.Exists,
-                response.Exists ? response.Value : default(object),
-                response.Exists ? response.Metadata : default(object));
         }
 
         #endregion
 
         #region [ IKeyValueStorer ]
 
-        public async Task StoreAsync(
+        public override async Task StoreAsync(
             string key,
             byte[] value,
             KeyValueStoreMode storeMode = KeyValueStoreMode.CreateOrReplace,
@@ -322,7 +275,7 @@ namespace KeyValueStorage.Protos
                 request, cancellationToken: cancellationToken);
         }
 
-        public async Task RemoveAsync(
+        public override async Task RemoveAsync(
             string key,
             CancellationToken cancellationToken = default)
         {
@@ -341,35 +294,13 @@ namespace KeyValueStorage.Protos
                 request, cancellationToken: cancellationToken);
         }
 
-        async Task IKeyValueStorer.StoreAsync(
-            object key,
-            object value,
-            KeyValueStoreMode storeMode,
-            CancellationToken cancellationToken)
-        {
-            await StoreAsync(
-                (string)key,
-                (byte[])value,
-                storeMode,
-                cancellationToken);
-        }
-
-        async Task IKeyValueStorer.RemoveAsync(
-            object key,
-            CancellationToken cancellationToken)
-        {
-            await RemoveAsync(
-                (string)key,
-                cancellationToken);
-        }
-
         #endregion
 
         #region [ IKeyValueMetadataStorer ]
 
-        public async Task StoreMetadataAsync(
+        public override async Task StoreMetadataAsync(
             string key,
-            IEnumerable<KeyValuePair<string, string>> metadata,
+            Metadata metadata,
             KeyValueStoreMode storeMode = KeyValueStoreMode.CreateOrReplace,
             CancellationToken cancellationToken = default)
         {
@@ -394,10 +325,10 @@ namespace KeyValueStorage.Protos
                 request, cancellationToken: cancellationToken);
         }
 
-        public async Task StoreMetadataAndValueAsync(
+        public override async Task StoreMetadataAndValueAsync(
             string key,
             byte[] value,
-            IEnumerable<KeyValuePair<string, string>> metadata,
+            Metadata metadata,
             KeyValueStoreMode storeMode = KeyValueStoreMode.CreateOrReplace,
             CancellationToken cancellationToken = default)
         {
@@ -423,40 +354,12 @@ namespace KeyValueStorage.Protos
                 request, cancellationToken: cancellationToken);
         }
 
-        async Task IKeyValueMetadataStorer.StoreMetadataAsync(
-            object key,
-            object metadata,
-            KeyValueStoreMode storeMode,
-            CancellationToken cancellationToken)
-        {
-            await StoreMetadataAsync(
-                (string)key,
-                (IEnumerable<KeyValuePair<string, string>>)metadata,
-                storeMode,
-                cancellationToken);
-        }
-
-        async Task IKeyValueMetadataStorer.StoreMetadataAndValueAsync(
-            object key,
-            object value,
-            object metadata,
-            KeyValueStoreMode storeMode,
-            CancellationToken cancellationToken)
-        {
-            await StoreMetadataAndValueAsync(
-                (string)key,
-                (byte[])value,
-                (IEnumerable<KeyValuePair<string, string>>)metadata,
-                storeMode,
-                cancellationToken);
-        }
-
         #endregion
 
         #region [ IKeyLister ]
 
-        public async Task<ICollection<KeyListerItem<string>>> ListKeysAsync(
-            CancellationToken cancellationToken)
+        public override async Task<ICollection<KeyListerItem<string>>> ListKeysAsync(
+            CancellationToken cancellationToken = default)
         {
             await CheckCapability(
                 KeyValueStorageCapability.List,
@@ -472,20 +375,12 @@ namespace KeyValueStorage.Protos
             return ToKeyListerItems(response.Items);
         }
 
-        async Task<ICollection<Abstractions.KeyListerItem>> IKeyLister.ListKeysAsync(
-            CancellationToken cancellationToken)
-        {
-            var response = await ListKeysAsync(cancellationToken);
-
-            return ToKeyListerItems(response);
-        }
-
         #endregion
 
         #region [ IKeyMetadataLister ]
 
-        public async Task<ICollection<KeyMetadataListerItem<string, IEnumerable<KeyValuePair<string, string>>>>> ListMetadataKeysAsync(
-            CancellationToken cancellationToken)
+        public override async Task<ICollection<KeyMetadataListerItem<string, Metadata>>> ListMetadataKeysAsync(
+            CancellationToken cancellationToken = default)
         {
             await CheckCapability(
                 KeyValueStorageCapability.List | KeyValueStorageCapability.Metadata,
@@ -501,20 +396,12 @@ namespace KeyValueStorage.Protos
             return ToKeyMetadataListerItems(response.Items);
         }
 
-        async Task<ICollection<Abstractions.KeyMetadataListerItem>> IKeyMetadataLister.ListMetadataKeysAsync(
-            CancellationToken cancellationToken)
-        {
-            var response = await ListMetadataKeysAsync(cancellationToken);
-
-            return ToKeyMetadataListerItems(response);
-        }
-
         #endregion
 
         #region [ IKeyAsyncLister ]
 
-        public async IAsyncEnumerable<ICollection<KeyListerItem<string>>> ListAsyncKeys(
-            [EnumeratorCancellation] CancellationToken cancellationToken)
+        public override async IAsyncEnumerable<ICollection<KeyListerItem<string>>> ListAsyncKeys(
+            [EnumeratorCancellation] CancellationToken cancellationToken = default)
         {
             await CheckCapability(
                 KeyValueStorageCapability.AsyncList,
@@ -527,23 +414,12 @@ namespace KeyValueStorage.Protos
             var response = keyAsyncListerClient!.ListAsyncKeys(
                 request, cancellationToken: cancellationToken);
 
-            while (await response.ResponseStream.MoveNext(cancellationToken))
+            await foreach (var item in ToKeyListerItems(
+                response.ResponseStream,
+                page => page.Items,
+                cancellationToken))
             {
-                var page = response.ResponseStream.Current;
-
-                yield return ToKeyListerItems(page.Items);
-            }
-        }
-
-        async IAsyncEnumerable<ICollection<Abstractions.KeyListerItem>> IKeyAsyncLister.ListAsyncKeys(
-            [EnumeratorCancellation] CancellationToken cancellationToken)
-        {
-            var enumerable = ListAsyncKeys(cancellationToken)
-                .WithCancellation(cancellationToken);
-
-            await foreach (var items in enumerable)
-            {
-                yield return ToKeyListerItems(items);
+                yield return item;
             }
         }
 
@@ -551,8 +427,8 @@ namespace KeyValueStorage.Protos
 
         #region [ IKeyAsyncMetadataLister ]
 
-        public async IAsyncEnumerable<ICollection<KeyMetadataListerItem<string, IEnumerable<KeyValuePair<string, string>>>>> ListAsyncMetadataKeys(
-            [EnumeratorCancellation] CancellationToken cancellationToken)
+        public override async IAsyncEnumerable<ICollection<KeyMetadataListerItem<string, Metadata>>> ListAsyncMetadataKeys(
+            [EnumeratorCancellation] CancellationToken cancellationToken = default)
         {
             await CheckCapability(
                 KeyValueStorageCapability.AsyncList | KeyValueStorageCapability.Metadata,
@@ -565,23 +441,12 @@ namespace KeyValueStorage.Protos
             var response = keyAsyncMetadataListerClient!.ListAsyncMetadataKeys(
                 request, cancellationToken: cancellationToken);
 
-            while (await response.ResponseStream.MoveNext(cancellationToken))
+            await foreach (var item in ToKeyMetadataListerItems(
+                response.ResponseStream,
+                page => page.Items,
+                cancellationToken))
             {
-                var page = response.ResponseStream.Current;
-
-                yield return ToKeyMetadataListerItems(page.Items);
-            }
-        }
-
-        async IAsyncEnumerable<ICollection<Abstractions.KeyMetadataListerItem>> IKeyAsyncMetadataLister.ListAsyncMetadataKeys(
-            [EnumeratorCancellation] CancellationToken cancellationToken)
-        {
-            var enumerable = ListAsyncMetadataKeys(cancellationToken)
-                .WithCancellation(cancellationToken);
-
-            await foreach (var items in enumerable)
-            {
-                yield return ToKeyMetadataListerItems(items);
+                yield return item;
             }
         }
 
@@ -589,7 +454,7 @@ namespace KeyValueStorage.Protos
 
         #region [ IKeyPrefixLister ]
 
-        public async Task<ICollection<KeyListerItem<string>>> ListPrefixedKeysAsync(
+        public override async Task<ICollection<KeyListerItem<string>>> ListPrefixedKeysAsync(
             string keyPrefix,
             CancellationToken cancellationToken = default)
         {
@@ -610,22 +475,11 @@ namespace KeyValueStorage.Protos
             return ToKeyListerItems(response.Items);
         }
 
-        async Task<ICollection<Abstractions.KeyListerItem>> IKeyPrefixLister.ListPrefixedKeysAsync(
-            object keyPrefix,
-            CancellationToken cancellationToken)
-        {
-            var response = await ListPrefixedKeysAsync(
-                (string)keyPrefix,
-                cancellationToken);
-
-            return ToKeyListerItems(response);
-        }
-
         #endregion
 
         #region [ IKeyPrefixMetadataLister ]
 
-        public async Task<ICollection<KeyMetadataListerItem<string, IEnumerable<KeyValuePair<string, string>>>>> ListPrefixedMetadataKeysAsync(
+        public override async Task<ICollection<KeyMetadataListerItem<string, Metadata>>> ListPrefixedMetadataKeysAsync(
             string keyPrefix,
             CancellationToken cancellationToken = default)
         {
@@ -646,22 +500,11 @@ namespace KeyValueStorage.Protos
             return ToKeyMetadataListerItems(response.Items);
         }
 
-        async Task<ICollection<Abstractions.KeyMetadataListerItem>> IKeyPrefixMetadataLister.ListPrefixedMetadataKeysAsync(
-            object keyPrefix,
-            CancellationToken cancellationToken)
-        {
-            var response = await ListPrefixedMetadataKeysAsync(
-                (string)keyPrefix,
-                cancellationToken);
-
-            return ToKeyMetadataListerItems(response);
-        }
-
         #endregion
 
         #region [ IKeyPrefixAsyncLister ]
 
-        public async IAsyncEnumerable<ICollection<KeyListerItem<string>>> ListAsyncPrefixedKeys(
+        public override async IAsyncEnumerable<ICollection<KeyListerItem<string>>> ListAsyncPrefixedKeys(
             string keyPrefix,
             [EnumeratorCancellation] CancellationToken cancellationToken = default)
         {
@@ -679,24 +522,12 @@ namespace KeyValueStorage.Protos
             var response = keyPrefixAsyncListerClient!.ListAsyncPrefixedKeys(
                 request, cancellationToken: cancellationToken);
 
-            while (await response.ResponseStream.MoveNext(cancellationToken))
+            await foreach (var item in ToKeyListerItems(
+                response.ResponseStream,
+                page => page.Items,
+                cancellationToken))
             {
-                var page = response.ResponseStream.Current;
-
-                yield return ToKeyListerItems(page.Items);
-            }
-        }
-
-        async IAsyncEnumerable<ICollection<Abstractions.KeyListerItem>> IKeyPrefixAsyncLister.ListAsyncPrefixedKeys(
-            object keyPrefix,
-            [EnumeratorCancellation] CancellationToken cancellationToken)
-        {
-            var enumerable = ListAsyncPrefixedKeys((string)keyPrefix, cancellationToken)
-                .WithCancellation(cancellationToken);
-
-            await foreach (var items in enumerable)
-            {
-                yield return ToKeyListerItems(items);
+                yield return item;
             }
         }
 
@@ -704,7 +535,7 @@ namespace KeyValueStorage.Protos
 
         #region [ IKeyPrefixAsyncMetadataLister ]
 
-        public async IAsyncEnumerable<ICollection<KeyMetadataListerItem<string, IEnumerable<KeyValuePair<string, string>>>>> ListAsyncPrefixedMetadataKeys(
+        public override async IAsyncEnumerable<ICollection<KeyMetadataListerItem<string, Metadata>>> ListAsyncPrefixedMetadataKeys(
             string keyPrefix,
             [EnumeratorCancellation] CancellationToken cancellationToken = default)
         {
@@ -722,24 +553,128 @@ namespace KeyValueStorage.Protos
             var response = keyPrefixAsyncMetadataListerClient!.ListAsyncPrefixedMetadataKeys(
                 request, cancellationToken: cancellationToken);
 
-            while (await response.ResponseStream.MoveNext(cancellationToken))
+            await foreach (var item in ToKeyMetadataListerItems(
+                response.ResponseStream,
+                page => page.Items,
+                cancellationToken))
             {
-                var page = response.ResponseStream.Current;
-
-                yield return ToKeyMetadataListerItems(page.Items);
+                yield return item;
             }
         }
 
-        async IAsyncEnumerable<ICollection<Abstractions.KeyMetadataListerItem>> IKeyPrefixAsyncMetadataLister.ListAsyncPrefixedMetadataKeys(
-            object keyPrefix,
-            [EnumeratorCancellation] CancellationToken cancellationToken)
-        {
-            var enumerable = ListAsyncPrefixedMetadataKeys((string)keyPrefix, cancellationToken)
-                .WithCancellation(cancellationToken);
+        #endregion
 
-            await foreach (var items in enumerable)
+        #region [ IKeyStoreEvents ]
+
+        public override async IAsyncEnumerable<ICollection<KeyStoreEvent<string>>> SubscribeKeyEvents(
+            CancellationToken cancellationToken = default)
+        {
+            await CheckCapability(
+                KeyValueStorageCapability.StoreEvents,
+                "StoreEvents",
+                keyStoreEventsClient is null,
+                cancellationToken);
+
+            var request = new SubscribeKeyEventsRequest();
+
+            var response = keyStoreEventsClient!.SubscribeKeyEvents(
+                request, cancellationToken: cancellationToken);
+
+            await foreach (var item in ToKeyStoreEvents(
+                response.ResponseStream,
+                page => page.Events,
+                cancellationToken))
             {
-                yield return ToKeyMetadataListerItems(items);
+                yield return item;
+            }
+        }
+
+        #endregion
+
+        #region [ IKeyMetadataStoreEvents ]
+
+        public override async IAsyncEnumerable<ICollection<KeyMetadataStoreEvent<string, Metadata>>> SubscribeKeyMetadataEvents(
+            [EnumeratorCancellation] CancellationToken cancellationToken = default)
+        {
+            await CheckCapability(
+                KeyValueStorageCapability.StoreEvents | KeyValueStorageCapability.Metadata,
+                "StoreEvents and Metadata",
+                keyMetadataStoreEventsClient is null,
+                cancellationToken);
+
+            var request = new SubscribeKeyMetadataEventsRequest();
+
+            var response = keyMetadataStoreEventsClient!.SubscribeKeyMetadataEvents(
+                request, cancellationToken: cancellationToken);
+
+            await foreach (var item in ToKeyMetadataStoreEvents(
+                response.ResponseStream,
+                page => page.Events,
+                cancellationToken))
+            {
+                yield return item;
+            }
+        }
+
+        #endregion
+
+        #region [ IKeyPrefixStoreEvents ]
+
+        public override async IAsyncEnumerable<ICollection<KeyStoreEvent<string>>> SubscribeKeyPrefixEvents(
+            string keyPrefix, 
+            [EnumeratorCancellation] CancellationToken cancellationToken = default)
+        {
+            await CheckCapability(
+                KeyValueStorageCapability.StoreEvents | KeyValueStorageCapability.KeyPrefix,
+                "StoreEvents and KeyPrefix",
+                keyPrefixStoreEventsClient is null,
+                cancellationToken);
+
+            var request = new SubscribeKeyPrefixEventsRequest()
+            {
+                KeyPrefix = keyPrefix,
+            };
+
+            var response = keyPrefixStoreEventsClient!.SubscribeKeyPrefixEvents(
+                request, cancellationToken: cancellationToken);
+
+            await foreach (var item in ToKeyStoreEvents(
+                response.ResponseStream,
+                page => page.Events,
+                cancellationToken))
+            {
+                yield return item;
+            }
+        }
+
+        #endregion
+
+        #region [ IKeyPrefixMetadataStoreEvents ]
+
+        public override async IAsyncEnumerable<ICollection<KeyMetadataStoreEvent<string, Metadata>>> SubscribeKeyPrefixMetadataEvents(
+            string keyPrefix, 
+            [EnumeratorCancellation] CancellationToken cancellationToken = default)
+        {
+            await CheckCapability(
+                KeyValueStorageCapability.StoreEvents | KeyValueStorageCapability.Metadata | KeyValueStorageCapability.KeyPrefix,
+                "StoreEvents, Metadata and KeyPrefix",
+                keyPrefixMetadataStoreEventsClient is null,
+                cancellationToken);
+
+            var request = new SubscribeKeyPrefixMetadataEventsRequest()
+            {
+                KeyPrefix = keyPrefix,
+            };
+
+            var response = keyPrefixMetadataStoreEventsClient!.SubscribeKeyPrefixMetadataEvents(
+                request, cancellationToken: cancellationToken);
+
+            await foreach (var item in ToKeyMetadataStoreEvents(
+                response.ResponseStream,
+                page => page.Events,
+                cancellationToken))
+            {
+                yield return item;
             }
         }
 
@@ -747,30 +682,102 @@ namespace KeyValueStorage.Protos
 
         #region [ Selectors ]
 
-        private static Abstractions.KeyListerItem ToKeyListerItem(KeyListerItem<string> e) => new(e.Key);
+        private static KeyListerItem<string> ToKeyListerItem(KeyListerItem item) =>
+            new(item.Key);
 
-        private static KeyListerItem<string> ToKeyListerItem(KeyListerItem e) => new(e.Key);
+        private static KeyMetadataListerItem<string, Metadata> ToKeyMetadataListerItem(
+            KeyMetadataListerItem item) => new(item.Key, item.Metadata.ToList());
 
-        private static KeyMetadataListerItem<string, IEnumerable<KeyValuePair<string, string>>> ToKeyMetadataListerItem(
-            KeyMetadataListerItem e) => new(e.Key, e.Metadata.ToList());
+        private static KeyStoreEvent<string> ToKeyStoreEvent(KeyStoreEvent @event) =>
+            @event.Type switch
+            {
+                KeyStoreEventType.Created =>
+                    new KeyStoreEvent<string>.Created(@event.Key),
 
-        private static Abstractions.KeyMetadataListerItem ToKeyMetadataListerItem(
-            KeyMetadataListerItem<string, IEnumerable<KeyValuePair<string, string>>> e) =>
-            new(e.Key, e.Metadata);
+                KeyStoreEventType.Replaced =>
+                    new KeyStoreEvent<string>.Replaced(@event.Key),
 
-        private static ICollection<Abstractions.KeyListerItem> ToKeyListerItems(IEnumerable<KeyListerItem<string>> source) =>
-            source.Select(ToKeyListerItem).ToList();
+                KeyStoreEventType.Removed =>
+                    new KeyStoreEvent<string>.Removed(@event.Key),
+
+                _ => throw new NotSupportedException(),
+            };
+
+        private static KeyMetadataStoreEvent<string, Metadata> ToKeyMetadataStoreEvent(KeyMetadataStoreEvent @event) =>
+            @event.Type switch
+            {
+                KeyStoreEventType.Created =>
+                    new KeyMetadataStoreEvent<string, Metadata>.Created(
+                        @event.Key, @event.Metadata.ToList()),
+
+                KeyStoreEventType.Replaced =>
+                    new KeyMetadataStoreEvent<string, Metadata>.Replaced(
+                        @event.Key, @event.Metadata.ToList(), 
+                        @event.ReplacedMetadata, @event.ReplacedValue),
+
+                KeyStoreEventType.Removed =>
+                    new KeyMetadataStoreEvent<string, Metadata>.Removed(
+                        @event.Key, @event.Metadata.ToList()),
+
+                _ => throw new NotSupportedException(),
+            };
 
         private static ICollection<KeyListerItem<string>> ToKeyListerItems(IEnumerable<KeyListerItem> source) =>
             source.Select(ToKeyListerItem).ToList();
 
-        private static ICollection<KeyMetadataListerItem<string, IEnumerable<KeyValuePair<string, string>>>> ToKeyMetadataListerItems(
+        private static IAsyncEnumerable<ICollection<KeyListerItem<string>>> ToKeyListerItems<TPage>(
+            IAsyncStreamReader<TPage> source,
+            Func<TPage, IEnumerable<KeyListerItem>> toItems,
+            CancellationToken cancellationToken) =>
+            ToAsyncEnumerable(source, cancellationToken)
+                .Select(toItems)
+                .Select(ToKeyListerItems);
+
+        private static ICollection<KeyMetadataListerItem<string, Metadata>> ToKeyMetadataListerItems(
             IEnumerable<KeyMetadataListerItem> source) =>
             source.Select(ToKeyMetadataListerItem).ToList();
 
-        private static ICollection<Abstractions.KeyMetadataListerItem> ToKeyMetadataListerItems(
-            IEnumerable<KeyMetadataListerItem<string, IEnumerable<KeyValuePair<string, string>>>> source) =>
-            source.Select(ToKeyMetadataListerItem).ToList();
+        private static IAsyncEnumerable<ICollection<KeyMetadataListerItem<string, Metadata>>> ToKeyMetadataListerItems<TPage>(
+            IAsyncStreamReader<TPage> source,
+            Func<TPage, IEnumerable<KeyMetadataListerItem>> toItems,
+            CancellationToken cancellationToken) =>
+            ToAsyncEnumerable(source, cancellationToken)
+                .Select(toItems)
+                .Select(ToKeyMetadataListerItems);
+
+        private static ICollection<KeyStoreEvent<string>> ToKeyStoreEvents(IEnumerable<KeyStoreEvent> source) =>
+            source.Select(ToKeyStoreEvent).ToList();
+
+        private static IAsyncEnumerable<ICollection<KeyStoreEvent<string>>> ToKeyStoreEvents<TPage>(
+            IAsyncStreamReader<TPage> source,
+            Func<TPage, IEnumerable<KeyStoreEvent>> toItems,
+            CancellationToken cancellationToken) =>
+            ToAsyncEnumerable(source, cancellationToken)
+                .Select(toItems)
+                .Select(ToKeyStoreEvents);
+
+        private static ICollection<KeyMetadataStoreEvent<string, Metadata>> ToKeyMetadataStoreEvents(
+            IEnumerable<KeyMetadataStoreEvent> source) =>
+            source.Select(ToKeyMetadataStoreEvent).ToList();
+
+        private static IAsyncEnumerable<ICollection<KeyMetadataStoreEvent<string, Metadata>>> ToKeyMetadataStoreEvents<TPage>(
+            IAsyncStreamReader<TPage> source,
+            Func<TPage, IEnumerable<KeyMetadataStoreEvent>> toItems,
+            CancellationToken cancellationToken) =>
+            ToAsyncEnumerable(source, cancellationToken)
+                .Select(toItems)
+                .Select(ToKeyMetadataStoreEvents);
+
+        private static async IAsyncEnumerable<T> ToAsyncEnumerable<T>(
+            IAsyncStreamReader<T> source,
+            [EnumeratorCancellation] CancellationToken cancellationToken = default)
+        {
+
+            while (await source.MoveNext(cancellationToken))
+            {
+                yield return source.Current;
+            }
+        }
 
         #endregion
     }
